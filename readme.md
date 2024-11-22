@@ -154,9 +154,7 @@ project/
 ├── core/
 │   ├── __init__.py
 │   ├── video_processor.py
-│   ├── audio_manager.py
-│   ├── transcription_manager.py
-│   ├── subtitle_manager.py
+│   ├── audio_processor.py
 │   └── ffmpeg_manager.py
 ├── utils/
 │   ├── __init__.py
@@ -175,9 +173,13 @@ git clone https://github.com/fetafisken00/brainrot.git
 cd brainrot
 
 # Create and activate conda environment from yml file
-conda env create -f requirements.yml
+conda env create -f environment.yml
 conda activate brainrot
 ```
+You must have ffmpeg in your path.
+Also you need to run it with administrative privileges, or create a pull request with a check for linux and use that.
+
+Note: you need to be able to use admin with conda environment this might be an issue if its not in path(?), sudo is an option but idk what else you can use if you dont want to put in path.
 
 ## Usage
 
@@ -185,43 +187,6 @@ Basic usage:
 ```bash
 python main.py -v input_video.mp4 -a input_audio.wav -o output_video.mp4
 ```
-
-Advanced usage with options:
-```bash
-python main.py \
-    -v input_video.mp4 \
-    -a input_audio.wav \
-    -o output_video.mp4 \
-    --model medium \
-    --font-size 28 \
-    --normalize-audio \
-    --threads 8 \
-    --preview \
-    --verbose
-```
-
-### Command Line Arguments
-
-Required Arguments:
-- `-v, --video`: Input video file path
-- `-a, --audio`: Input audio file path
-- `-o, --output`: Output video file path
-
-Model Settings:
-- `-m, --model`: Whisper model size (tiny/base/small/medium/large) [default: base]
-
-Caption Styling:
-- `--font-size`: Caption font size in pixels [default: 24]
-
-Processing Control:
-- `--force`: Overwrite output file if exists
-- `--preview`: Process only first 30 seconds
-- `--threads`: Number of CPU threads (0 for auto-detection) [default: 4]
-- `--verbose`: Show detailed processing information
-
-Audio Processing:
-- `--normalize-audio`: Normalize audio levels
-- `--audio-offset`: Offset audio timing in seconds [default: 0.0]
 
 ## Dependencies
 

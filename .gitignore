@@ -1,2 +1,5 @@
 .env
 *.env
+input.mp4
+out_temp.mp4
+out.mp4

@@ -1,0 +1,23 @@
+# config.yaml
+video_processing:
+  input_video: "input.mp4"
+  input_audio: "fuck.wav"
+  output_video: "out.mp4"
+
+model_settings:
+  whisper_model: "base"  # tiny, base, small, medium, large
+  device: "cpu"  # cpu or cuda
+  num_speakers: 2  # optional, number of speakers if known
+  threads: 12
+
+styling:
+  font_size: 72
+
+processing:
+  force_overwrite: false
+  preview_mode: false
+  loglevel: "info"  # options: debug, info, warning, error, critical
+
+audio:
+  normalize: false
+  offset: 0.0  # seconds
