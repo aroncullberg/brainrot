@@ -169,18 +169,14 @@ project/
 ```
 
 ## Installation
-
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/video-processing-tool.git
-cd video-processing-tool
+git clone https://github.com/fetafisken00/brainrot.git
+cd brainrot
 
-# Create a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install requirements
-pip install -r requirements.txt
+# Create and activate conda environment from yml file
+conda env create -f requirements.yml
+conda activate brainrot
 ```
 
 ## Usage
@@ -235,15 +231,7 @@ Audio Processing:
 - Python 3.8+
 
 ## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Haha, funny joke
 
 ## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+?

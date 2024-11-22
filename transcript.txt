@@ -1,0 +1,63 @@
+
+SPEAKER 2 0:00:00
+OK, so you sent us all these articles and excerpts and even like a whole college syllabus on data ethics. 
+SPEAKER 1 0:00:07
+It is quite the collection. 
+SPEAKER 2 0:00:08
+Yeah, it's a lot. So we're going to do a deep dive into all this stuff. 
+SPEAKER 1 0:00:11
+Right. See if we can't synthesize it all down into something understandable. 
+SPEAKER 2 0:00:14
+Exactly. 
+SPEAKER 1 0:00:15
+Help you understand the core ideas behind all this. 
+SPEAKER 2 0:00:18
+Yeah, because it's complicated, right? Like different cultures think about data ethics in totally different ways. 
+SPEAKER 1 0:00:23
+Right. And it's a question that's puzzled philosophers for centuries. 
+SPEAKER 2 0:00:27
+Oh, yeah, for sure. 
+SPEAKER 1 0:00:28
+Even more complicated now in the digital age. 
+SPEAKER 2 0:00:31
+Absolutely. So maybe we should just start with the basics. 
+SPEAKER 1 0:00:35
+Sure. 
+SPEAKER 2 0:00:35
+Like you've highlighted some of the classic ethical frameworks. 
+SPEAKER 1 0:00:38
+Right, right. 
+SPEAKER 2 0:00:39
+Like utilitarianism. 
+SPEAKER 1 0:00:41
+Yes, utilitarianism. 
+SPEAKER 2 0:00:42
+It's all about like maximizing happiness, right? 
+SPEAKER 1 0:00:44
+Exactly. It's all about consequences. Yeah. Actions are judged by whether they lead to the greatest happiness for the greatest number of people. 
+SPEAKER 2 0:00:52
+Yeah. So it's kind of like a happiness calculator. 
+SPEAKER 1 0:00:54
+Right. Like weighing the pros and cons of each decision. 
+SPEAKER 2 0:00:58
+And, you know, speaking of that, you sent that chapter excerpt with that tough decision. 
+SPEAKER 1 0:01:02
+Oh, right. 
+SPEAKER 2 0:01:03
+Remember where the character had to choose between helping their friend study or going out for pizza and beer? 
+SPEAKER 1 0:01:09
+Yes. A utilitarian would say, OK, we'll tally up the potential happiness points for each option. Yeah. And then choose the winner. 
+SPEAKER 2 0:01:16
+Right. But that article also pointed out some problems with utilitarianism. 
+SPEAKER 1 0:01:21
+That's for sure. It has its limitations. Yeah. Especially when you apply it to complex real world situations. 
+SPEAKER 2 0:01:27
+Like how do you even measure that? How do you even measure happiness? 
+SPEAKER 1 0:01:29
+Right. 
+SPEAKER 2 0:01:30
+You know, can you actually quantify it consistently? 
+SPEAKER 1 0:01:32
+It's tough. 
+SPEAKER 2 0:01:33
+And what about like those long-term? 

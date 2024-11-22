@@ -1,4 +1,4 @@
-name: caption-gen
+name: brainrot
 channels:
   - pytorch
   - conda-forge
