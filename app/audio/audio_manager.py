@@ -48,8 +48,6 @@ class AudioManager:
         self.merge_segments(segments, diarization)
         # print([seg for seg in segments])
 
-        exit()
-        
         return segments
 
     def merge_segments(self, segments, diarization_output):

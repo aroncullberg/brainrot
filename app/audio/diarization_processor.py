@@ -1,4 +1,6 @@
 import os
+
+import torchaudio
 os.environ["SPEECHBRAIN_USE_SYMLINKS"] = "False"
 import torch
 from pyannote.audio import Pipeline
@@ -31,38 +33,20 @@ class DiarizationProcessor:
             use_auth_token=hf_token
         )
 
-        # Optional parameters for the pipeline
-        self.pipeline.instantiate({
-            # Voice activity detection
-            "vad.onset": 0.8,      # Higher threshold for speech detection onset
-            "vad.offset": 0.6,     # Lower threshold for speech detection offset
-            "vad.min_duration_on": 0.2,  # Minimum duration of speech segment
-            "vad.min_duration_off": 0.1, # Minimum duration of non-speech segment
-            
-            # Speaker change detection
-            "scd.threshold": 0.4,   # Threshold for detecting speaker changes
-            "scd.min_duration": 1.0, # Minimum duration between speaker changes
-            
-            # Speaker clustering
-            "clustering.threshold": 0.75,  # Higher threshold for better speaker separation
-            "clustering.min_cluster_size": 10,  # Minimum size of speaker clusters
-            
-            # Segmentation
-            "segmentation.min_duration_per_speaker": 1.0,  # Minimum duration per speaker turn
-            "segmentation.max_duration_per_speaker": 10.0  # Maximum duration per speaker turn
-
-        })
     
     def process(self, audio_path: str, progress_hook: bool = True) -> Pipeline:
         audio_path = Path(audio_path)
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        waveform, sample_rate = torchaudio.load(audio_path)
+
         
         self.LOG.info("Performing speaker diarization...")
         if progress_hook:
             with ProgressHook() as hook:
                 return self.pipeline(
-                    str(audio_path),
+                    {"waveform": waveform, "sample_rate": sample_rate},
                     num_speakers=self.num_speakers,
                     hook=hook
                 )

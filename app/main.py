@@ -2,7 +2,7 @@
 from collections import defaultdict
 import os
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 import cv2
 import numpy as np
 from audio.transcribed_segment import TranscribedSegment
@@ -15,10 +15,15 @@ import logging
 from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
+
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
+import numpy as np
+import threading
+from typing import List, Dict, Tuple
 
 class TextRenderer:
     """Cache text renderings to avoid redundant operations."""
@@ -44,6 +49,27 @@ class TextRenderer:
         
         self.cache = {}
         self.cache_lock = threading.Lock()
+
+    def wrap_text_pil(self, text: str, max_width: int) -> List[str]:
+        """Wrap text to fit within max_width using PIL's font metrics."""
+        words = text.split()
+        if not words:
+            return []
+            
+        lines = []
+        current_line = words[0]
+        
+        for word in words[1:]:
+            test_line = f"{current_line} {word}"
+            bbox = self.font.getbbox(test_line)
+            if bbox[2] > max_width:
+                lines.append(current_line)
+                current_line = word
+            else:
+                current_line = test_line
+        
+        lines.append(current_line)
+        return lines
 
     def set_border_style(self, 
                         color: Tuple[int, int, int] = (0, 0, 0),
@@ -208,7 +234,7 @@ def add_text_overlay(input_video: Path, input_audio: Path, output_video: Path,
     
     print(f"Processing frames up to {last_segment_end:.2f} seconds ({frames_to_process} frames)...")
     
-    with ThreadPoolExecutor(max_workers=os.cpu_count() / 2) as executor:
+    with ThreadPoolExecutor(max_workers=os.cpu_count() - 2) as executor:
         for frame_number in range(frames_to_process):
             ret, frame = cap.read()
             if not ret:

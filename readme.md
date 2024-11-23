@@ -181,6 +181,8 @@ Also you need to run it with administrative privileges, or create a pull request
 
 Note: you need to be able to use admin with conda environment this might be an issue if its not in path(?), sudo is an option but idk what else you can use if you dont want to put in path.
 
+Also create huggingface account and create key https://huggingface.co/pyannote/speaker-diarization-3.1
+put it int .env, if no .env run program once.
 ## Usage
 
 Basic usage:
