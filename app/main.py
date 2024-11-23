@@ -16,7 +16,128 @@ from datetime import timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
 from PIL import Image, ImageDraw, ImageFont
+from concurrent.futures import ThreadPoolExecutor
+import threading
 
+
+class TextRenderer:
+    """Cache text renderings to avoid redundant operations."""
+    def __init__(self, font_path: str, font_size: int, width: int, height: int):
+        try:
+            self.font = ImageFont.truetype(font_path, font_size)
+        except OSError:
+            print("Warning: Custom font not found, using default font")
+            self.font = ImageFont.load_default()
+            
+        self.font_size = font_size
+        self.width = width
+        self.height = height
+        
+        # Border styling options
+        self.stroke_width = max(3, font_size // 25)
+        self.border_color = (0, 0, 0, 255)  # Black border by default
+        self.border_opacity = 255  # Full opacity
+        self.blur_radius = 0  # No blur by default
+        self.double_border = False  # Single border by default
+        self.outer_border_color = (128, 128, 128, 255)  # Grey outer border
+        self.outer_stroke_width = 2  # Width of outer border
+        
+        self.cache = {}
+        self.cache_lock = threading.Lock()
+
+    def set_border_style(self, 
+                        color: Tuple[int, int, int] = (0, 0, 0),
+                        opacity: int = 255,
+                        stroke_width: int = None,
+                        blur_radius: int = 0,
+                        double_border: bool = False,
+                        outer_color: Tuple[int, int, int] = (128, 128, 128),
+                        outer_width: int = 2):
+        """Configure border styling options."""
+        self.border_color = (*color, opacity)
+        if stroke_width is not None:
+            self.stroke_width = stroke_width
+        self.blur_radius = blur_radius
+        self.double_border = double_border
+        self.outer_border_color = (*outer_color, opacity)
+        self.outer_stroke_width = outer_width
+        # Clear cache when style changes
+        with self.cache_lock:
+            self.cache.clear()
+
+    def apply_blur(self, img: Image.Image, radius: int) -> Image.Image:
+        """Apply gaussian blur to the image."""
+        if radius > 0:
+            return img.filter(ImageFilter.GaussianBlur(radius))
+        return img
+
+    def render_text_to_mask(self, text: str, color: Tuple[int, int, int]) -> np.ndarray:
+        """Render text to a transparent RGBA mask with custom border styling."""
+        # Check cache first
+        cache_key = f"{text}_{color}"
+        with self.cache_lock:
+            if cache_key in self.cache:
+                return self.cache[cache_key].copy()
+        
+        margin = self.width * 0.1
+        wrapped_lines = self.wrap_text_pil(text, self.width - 2 * margin)
+        
+        line_spacing = self.font_size * 0.3
+        total_height = len(wrapped_lines) * (self.font_size + line_spacing)
+        
+        # Create a transparent image for the text
+        mask = Image.new('RGBA', (self.width, self.height), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(mask)
+        
+        y_start = self.height - total_height - self.height * 0.2
+        
+        # Draw text with custom border
+        for i, line in enumerate(wrapped_lines):
+            bbox = self.font.getbbox(line)
+            text_width = bbox[2] - bbox[0]
+            x = (self.width - text_width) // 2
+            y = y_start + i * (self.font_size + line_spacing)
+            
+            if self.double_border:
+                # Draw outer border first
+                outer_width = self.stroke_width + self.outer_stroke_width
+                for offset_x in range(-outer_width, outer_width + 1):
+                    for offset_y in range(-outer_width, outer_width + 1):
+                        draw.text(
+                            (x + offset_x, y + offset_y),
+                            line,
+                            font=self.font,
+                            fill=self.outer_border_color
+                        )
+            
+            # Draw main border
+            for offset_x in range(-self.stroke_width, self.stroke_width + 1):
+                for offset_y in range(-self.stroke_width, self.stroke_width + 1):
+                    draw.text(
+                        (x + offset_x, y + offset_y),
+                        line,
+                        font=self.font,
+                        fill=self.border_color
+                    )
+            
+            # Draw main text
+            draw.text(
+                (x, y),
+                line,
+                font=self.font,
+                fill=(*color, 255)
+            )
+        
+        # Apply blur if specified
+        if self.blur_radius > 0:
+            mask = self.apply_blur(mask, self.blur_radius)
+        
+        # Convert to numpy array and cache
+        result = np.array(mask)
+        with self.cache_lock:
+            self.cache[cache_key] = result.copy()
+        
+        return result
 
 def get_video_properties(video_path: Path):
     """Get video properties using OpenCV."""
@@ -32,33 +153,23 @@ def get_video_properties(video_path: Path):
     
     return width, height, fps, frame_count
 
-def wrap_text_pil(text: str, font: ImageFont.FreeTypeFont, max_width: int) -> List[str]:
-    """Wrap text to fit within max_width using PIL's font metrics."""
-    words = text.split()
-    lines = []
-    current_line = words[0]
+def process_frame(args):
+    """Process a single frame with text overlay."""
+    frame, texts_and_colors, renderer = args
     
-    for word in words[1:]:
-        test_line = f"{current_line} {word}"
-        bbox = font.getbbox(test_line)
-        if bbox[2] > max_width:  # bbox[2] is the width
-            lines.append(current_line)
-            current_line = word
-        else:
-            current_line = test_line
+    # Convert frame to RGBA
+    frame_rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
     
-    lines.append(current_line)
-    return lines
+    # Blend all text masks
+    for text, color in texts_and_colors:
+        text_mask = renderer.render_text_to_mask(text, color)
+        # Blend text mask with frame
+        alpha = text_mask[:, :, 3:4] / 255.0
+        frame_rgba = frame_rgba * (1 - alpha) + text_mask[:, :, :4] * alpha
+    
+    # Convert back to BGR
+    return cv2.cvtColor(frame_rgba.astype(np.uint8), cv2.COLOR_RGBA2BGR)
 
-def cv2_to_pil(cv2_image):
-    """Convert CV2 image to PIL Image."""
-    cv2_image = cv2.cvtColor(cv2_image, cv2.COLOR_BGR2RGB)
-    return Image.fromarray(cv2_image)
-
-def pil_to_cv2(pil_image):
-    """Convert PIL Image to CV2 image."""
-    cv2_image = np.array(pil_image)
-    return cv2.cvtColor(cv2_image, cv2.COLOR_RGB2BGR)
 
 def add_text_overlay(input_video: Path, input_audio: Path, output_video: Path, 
                     segments: List[TranscribedSegment], font_size: int = 90):
@@ -70,17 +181,17 @@ def add_text_overlay(input_video: Path, input_audio: Path, output_video: Path,
     colors = [(255, 255, 255), (255, 255, 0), (0, 255, 255),
              (0, 255, 0), (255, 192, 203), (255, 165, 0)]  # RGB format
     speaker_colors = defaultdict(lambda: (255, 255, 255))
-    
+
+    renderer = TextRenderer("sfuidisplay_bold.ttf", font_size, width, height)
+    renderer.set_border_style(
+        color=(0, 0, 0),
+        stroke_width=5,
+        opacity=255
+    )
+
     unique_speakers = {seg.speaker for seg in segments if seg.speaker}
     for i, speaker in enumerate(unique_speakers):
         speaker_colors[speaker] = colors[i % len(colors)]
-    
-    # Load custom font
-    try:
-        font = ImageFont.truetype("sfuidisplay_bold.ttf", font_size)
-    except OSError:
-        print("Warning: SF UI Display Bold font not found, using default font")
-        font = ImageFont.load_default()
     
     # Temp output file for video without audio
     temp_output = str(output_video).replace('.mp4', '_temp.mp4')
@@ -97,76 +208,39 @@ def add_text_overlay(input_video: Path, input_audio: Path, output_video: Path,
     
     print(f"Processing frames up to {last_segment_end:.2f} seconds ({frames_to_process} frames)...")
     
-    # Calculate stroke width based on font size
-    stroke_width = max(3, font_size // 25)
+    with ThreadPoolExecutor(max_workers=os.cpu_count() / 2) as executor:
+        for frame_number in range(frames_to_process):
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            current_time = frame_number / fps
+            
+            if current_time > last_segment_end:
+                print("Reached the end of the last segment. Stopping processing.")
+                break
+            
+            # Find active segments for the current time
+            active_segments = [
+                seg for seg in segments 
+                if seg.start <= current_time <= seg.end
+            ]
+
+            # Prepare text and add colors for active segments
+            text_and_colors = [
+                (seg.text.strip(), speaker_colors[seg.speaker])
+                for seg in active_segments
+            ]
+
+            # Process frame with text overlay
+            frame_with_text = process_frame((frame, text_and_colors, renderer))
+            out.write(frame_with_text)
+
+            
+            if frame_number % 100 == 0 or frame_number == frames_to_process - 1:
+                progress = (frame_number + 1) / frames_to_process * 100
+                print(f"Processed {frame_number + 1}/{frames_to_process} frames ({progress:.2f}% complete)")
     
-    for frame_number in range(frames_to_process):
-        ret, frame = cap.read()
-        if not ret:
-            break
-        
-        current_time = frame_number / fps
-        
-        if current_time > last_segment_end:
-            print("Reached the end of the last segment. Stopping processing.")
-            break
-        
-        # Convert frame to PIL Image for text rendering
-        pil_frame = cv2_to_pil(frame)
-        draw = ImageDraw.Draw(pil_frame)
-        
-        # Find active segments for the current time
-        active_segments = [
-            seg for seg in segments 
-            if seg.start <= current_time <= seg.end
-        ]
-        
-        # Add text for each active segment
-        for segment in active_segments:
-            text = segment.text.strip()
-            color = speaker_colors[segment.speaker]
-            
-            # Wrap text to fit video width (leaving margins)
-            margin = width * 0.1  # 10% margin on each side
-            wrapped_text = wrap_text_pil(text, font, width - 2 * margin)
-            
-            # Calculate text block height
-            line_spacing = font_size * 0.3  # 30% of font size
-            total_height = len(wrapped_text) * (font_size + line_spacing)
-            
-            # Position text block in lower third of screen
-            y_start = height - total_height - height * 0.2  # 20% from bottom
-            
-            # Draw each line
-            for i, line in enumerate(wrapped_text):
-                # Get text width for centering
-                bbox = font.getbbox(line)
-                text_width = bbox[2] - bbox[0]
-                x = (width - text_width) // 2
-                y = y_start + i * (font_size + line_spacing)
-                
-                # Draw text stroke (outline)
-                for offset_x in range(-stroke_width, stroke_width + 1):
-                    for offset_y in range(-stroke_width, stroke_width + 1):
-                        draw.text(
-                            (x + offset_x, y + offset_y), 
-                            line, 
-                            font=font,
-                            fill=(0, 0, 0)  # Black outline
-                        )
-                
-                # Draw main text
-                draw.text(
-                    (x, y),
-                    line,
-                    font=font,
-                    fill=color
-                )
-        
-        # Convert back to CV2 format and write
-        cv2_frame = pil_to_cv2(pil_frame)
-        out.write(cv2_frame)
-        
         # Log progress
         if frame_number % 100 == 0 or frame_number == frames_to_process - 1:
             progress = (frame_number + 1) / frames_to_process * 100
