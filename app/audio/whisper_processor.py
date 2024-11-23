@@ -25,14 +25,18 @@ class WhisperProcessor:
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
             
         self.LOG.info(f"Transcribing audio: {audio_path}")
+
         result = self.model.transcribe(
             str(audio_path),
             fp16=False if self.device == "cpu" else True,
-            verbose=True,
-            language="en"
+            verbose=False,
+            language="en",
+            word_timestamps=True,
+            condition_on_previous_text=True ,
             )
         
         segments = []
+        last_end = 0.0
         for i, segment in enumerate(result["segments"]):
             segments.append(TranscribedSegment(
                 start=segment["start"],

@@ -30,7 +30,7 @@ class DiarizationProcessor:
             use_auth_token=hf_token
         )
     
-    def process(self, audio_path: str, progress_hook: bool = True):
+    def process(self, audio_path: str, progress_hook: bool = True) -> Pipeline:
         audio_path = Path(audio_path)
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")

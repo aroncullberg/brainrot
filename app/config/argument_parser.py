@@ -50,7 +50,7 @@ class ArgumentParser:
         # Model Settings
         model_group = self.parser.add_argument_group('Model Settings')
         model_group.add_argument('-m', '--model', type=str, default='base',
-                               choices=['tiny', 'base', 'small', 'medium', 'large'],
+                               choices=['tiny', 'base', 'small', 'medium', 'large', 'turbo'],
                                help='Whisper model size [default: %(default)s]')
         model_group.add_argument('--speakers', type=int, default=2,
                                  help='Number of speakers in the audio [default: %(default)s]')
