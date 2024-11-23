@@ -14,10 +14,11 @@ class DiarizationProcessor:
                  device: str = "cpu",
                  num_speakers: Optional[int] = None,
                  logger: logging.Logger = None):
+
         self.LOG = logger
         self.device = torch.device(device)
         self.num_speakers = num_speakers
-        
+
         self.LOG.info("Loading speaker embedding model...")
         self.embedding_model = PretrainedSpeakerEmbedding(
             "speechbrain/spkrec-ecapa-voxceleb",
@@ -29,6 +30,28 @@ class DiarizationProcessor:
             "pyannote/speaker-diarization-3.1",
             use_auth_token=hf_token
         )
+
+        # Optional parameters for the pipeline
+        self.pipeline.instantiate({
+            # Voice activity detection
+            "vad.onset": 0.8,      # Higher threshold for speech detection onset
+            "vad.offset": 0.6,     # Lower threshold for speech detection offset
+            "vad.min_duration_on": 0.2,  # Minimum duration of speech segment
+            "vad.min_duration_off": 0.1, # Minimum duration of non-speech segment
+            
+            # Speaker change detection
+            "scd.threshold": 0.4,   # Threshold for detecting speaker changes
+            "scd.min_duration": 1.0, # Minimum duration between speaker changes
+            
+            # Speaker clustering
+            "clustering.threshold": 0.75,  # Higher threshold for better speaker separation
+            "clustering.min_cluster_size": 10,  # Minimum size of speaker clusters
+            
+            # Segmentation
+            "segmentation.min_duration_per_speaker": 1.0,  # Minimum duration per speaker turn
+            "segmentation.max_duration_per_speaker": 10.0  # Maximum duration per speaker turn
+
+        })
     
     def process(self, audio_path: str, progress_hook: bool = True) -> Pipeline:
         audio_path = Path(audio_path)
