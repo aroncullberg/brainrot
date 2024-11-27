@@ -179,12 +179,37 @@ def get_video_properties(video_path: Path):
     
     return width, height, fps, frame_count
 
+# old with cpu
+# def process_frame(args):
+#     """Process a single frame with text overlay."""
+#     frame, texts_and_colors, renderer = args
+    
+#     # Convert frame to RGBA
+#     frame_rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+    
+#     # Blend all text masks
+#     for text, color in texts_and_colors:
+#         text_mask = renderer.render_text_to_mask(text, color)
+#         # Blend text mask with frame
+#         alpha = text_mask[:, :, 3:4] / 255.0
+#         frame_rgba = frame_rgba * (1 - alpha) + text_mask[:, :, :4] * alpha
+    
+#     # Convert back to BGR
+#     return cv2.cvtColor(frame_rgba.astype(np.uint8), cv2.COLOR_RGBA2BGR)
+
+# new with gpu
 def process_frame(args):
-    """Process a single frame with text overlay."""
+    """Process a single frame with text overlay using GPU acceleration."""
     frame, texts_and_colors, renderer = args
     
-    # Convert frame to RGBA
-    frame_rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+    # Create UMat object to process on GPU
+    frame_gpu = cv2.UMat(frame)
+    
+    # Convert frame to RGBA on GPU
+    frame_rgba = cv2.cvtColor(frame_gpu, cv2.COLOR_BGR2RGBA)
+    
+    # Download to CPU for text rendering (PIL doesn't support GPU)
+    frame_rgba = frame_rgba.get()
     
     # Blend all text masks
     for text, color in texts_and_colors:
@@ -193,16 +218,36 @@ def process_frame(args):
         alpha = text_mask[:, :, 3:4] / 255.0
         frame_rgba = frame_rgba * (1 - alpha) + text_mask[:, :, :4] * alpha
     
-    # Convert back to BGR
-    return cv2.cvtColor(frame_rgba.astype(np.uint8), cv2.COLOR_RGBA2BGR)
+    # Convert back to BGR using GPU
+    frame_gpu = cv2.UMat(frame_rgba.astype(np.uint8))
+    return cv2.cvtColor(frame_gpu, cv2.COLOR_RGBA2BGR).get()
 
 
 def add_text_overlay(input_video: Path, input_audio: Path, output_video: Path, 
-                    segments: List[TranscribedSegment], font_size: int = 90):
+                    segments: List[TranscribedSegment], font_size: int = 32):
+    # Enable OpenCL
+    if cv2.ocl.haveOpenCL():
+        cv2.ocl.setUseOpenCL(True)
+        print("OpenCL acceleration enabled")
+    else:
+        print("OpenCL not available, falling back to CPU")
+
+
     """Add text overlay to video using PIL for custom font rendering."""
     # Get video properties
     width, height, fps, frame_count = get_video_properties(input_video)
     
+
+    MAX_HEIGHT = 720
+    if height > MAX_HEIGHT:
+        # Resize video to fit within 720p
+        scale_factor = MAX_HEIGHT / height
+        width = int(width * scale_factor)
+        height = MAX_HEIGHT
+
+    TARGET_FPS = 60 
+    fps = min(fps, TARGET_FPS)
+
     # Setup color mapping for speakers
     colors = [(255, 255, 255), (255, 255, 0), (0, 255, 255),
              (0, 255, 0), (255, 192, 203), (255, 165, 0)]  # RGB format
@@ -235,15 +280,27 @@ def add_text_overlay(input_video: Path, input_audio: Path, output_video: Path,
     print(f"Processing frames up to {last_segment_end:.2f} seconds ({frames_to_process} frames)...")
     
     with ThreadPoolExecutor(max_workers=os.cpu_count() - 2) as executor:
-        for frame_number in range(frames_to_process):
+        frame_count = 0
+        while frame_count < frames_to_process:
             ret, frame = cap.read()
             if not ret:
                 break
+                
+            # Resize frame if necessary
+            if frame.shape[0] != height or frame.shape[1] != width:
+                frame_gpu = cv2.UMat(frame)
+                frame = cv2.resize(frame_gpu, (width, height), interpolation=cv2.INTER_AREA).get()
+
+
             
-            current_time = frame_number / fps
+            # Skip frames to match target FPS if necessary
+            if fps > TARGET_FPS and frame_count % int(fps / TARGET_FPS) != 0:
+                frame_count += 1
+                continue
+                
+            current_time = frame_count / fps
             
             if current_time > last_segment_end:
-                print("Reached the end of the last segment. Stopping processing.")
                 break
             
             # Find active segments for the current time
@@ -261,17 +318,14 @@ def add_text_overlay(input_video: Path, input_audio: Path, output_video: Path,
             # Process frame with text overlay
             frame_with_text = process_frame((frame, text_and_colors, renderer))
             out.write(frame_with_text)
-
             
-            if frame_number % 100 == 0 or frame_number == frames_to_process - 1:
-                progress = (frame_number + 1) / frames_to_process * 100
-                print(f"Processed {frame_number + 1}/{frames_to_process} frames ({progress:.2f}% complete)")
-    
-        # Log progress
-        if frame_number % 100 == 0 or frame_number == frames_to_process - 1:
-            progress = (frame_number + 1) / frames_to_process * 100
-            print(f"Processed {frame_number + 1}/{frames_to_process} frames ({progress:.2f}% complete)")
-    
+            if frame_count % 100 == 0:
+                progress = (frame_count + 1) / frames_to_process * 100
+                print(f"Processed {frame_count + 1}/{frames_to_process} frames ({progress:.2f}% complete)")
+            
+            frame_count += 1
+
+
     cap.release()
     out.release()
     
@@ -283,9 +337,25 @@ def add_text_overlay(input_video: Path, input_audio: Path, output_video: Path,
         '-i', str(input_audio),
         '-c:v', 'copy',
         '-c:a', 'aac',
+        # '-r', str(TARGET_FPS),
         '-strict', 'experimental',
         str(output_video)
     ]
+    # cmd = [
+    #     'ffmpeg', '-y',              # Yes to overwrite output
+    #     '-i', temp_output,           # Input video
+    #     '-i', str(input_audio),      # Input audio
+    #     '-c:v', 'libx264',          # CPU H.264 encoder
+    #     '-preset', 'medium',         # Balance between speed/compression (options: ultrafast to veryslow)
+    #     '-crf', '23',               # Constant Rate Factor - quality (18-28, lower = better)
+    #     '-maxrate', '4M',            # Maximum bitrate
+    #     '-b:a', '128k',             # Audio bitrate - valid
+    #     '-r', str(TARGET_FPS),      # Frame rate - valid if you need to specify
+    #     '-movflags', '+faststart',   # Valid - helps web playback
+    #     str(output_video)
+    # ]
+
+
     subprocess.run(cmd, check=True)
     
     # Remove temporary file
