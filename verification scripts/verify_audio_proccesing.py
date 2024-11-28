@@ -16,7 +16,7 @@ embedding_model = PretrainedSpeakerEmbedding(
 whisper_model = whisper.load_model("base")
 pipeline = Pipeline.from_pretrained(
     "pyannote/speaker-diarization-3.1",
-    use_auth_token="Yhf_HwlCKZOwYgvDKVvinWbrTiXbmOqEgZAEBV"
+    use_auth_token=""
 )
 
 # Process audio

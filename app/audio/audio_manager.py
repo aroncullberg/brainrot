@@ -52,24 +52,34 @@ class AudioManager:
 
     def merge_segments(self, segments, diarization_output):
         for segment in segments:
+            max_overlap = 0
+            best_speaker = None
+            best_speaker_confidence = 0.0
+
             for turn, _, speaker in diarization_output.itertracks(yield_label=True):
-                # self.LOG.info(f"Turn: {turn.start} - {turn.end} | Segment: {segment.start} - {segment.end}")
-                # self.LOG.info(f"Speaker: {speaker}")
-                # self.LOG.info(f"Text: {segment.text}")
-                # print("\n\n\n\n")
-                if abs(turn.start - segment.start) < 0.1 or abs(turn.end - segment.end) < 0.1:
-                # if turn.start <= segment.start <= turn.end - 0.2: 
-                    segment.speaker = speaker
-                    segment.speaker_confidence = (
-                        turn.confidence if hasattr(turn, 'confidence') else 0.0
-                    )
+                overlap_start = max(segment.start, turn.start)
+                overlap_end = min(segment.end, turn.end)
+                overlap = max(0, overlap_end - overlap_start)
+                
+                # Calculate overlap ratio relative to segment duration
+                segment_duration = segment.end - segment.start
+                overlap_ratio = overlap / segment_duration if segment_duration > 0 else 0
+                
+                if overlap_ratio > max_overlap:
+                    max_overlap = overlap_ratio
+                    best_speaker = speaker
+                    best_confidence = turn.confidence if hasattr(turn, 'confidence') else 0.0
+            
+            if max_overlap > seconds(0.2):
+                segment.speaker = best_speaker
+                segment.speaker_confidence = best_confidence
 
-                    # self.LOG.info(f"MATCH")
-                    # print("\n\n\n\n")
-                    break
-            # input("continue?")
 
-
-
+def seconds(second: float) -> float:
+    '''
+    Does nothing but to increase readability of code
+    without using a comment
+    '''
+    return second
 
     
